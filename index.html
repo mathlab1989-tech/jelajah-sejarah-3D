@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tur Candi Borobudur 3D</title>
+<style>
+:root{--st:#8c8276;--gr:#5b7a42;--or:#f3b27a;--ink:#2b2620;--pn:rgba(35,30,24,.86);box-sizing:border-box}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#e9a06a;font-family:Georgia,'Times New Roman',serif;color:#f6ede0}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 14px;background:#e9b87f;color:var(--ink);min-height:40px}
+button:hover{background:#f4cb98}button:focus-visible{outline:3px solid #fff}
+#hud{position:fixed;top:0;left:0;right:0;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;display:flex;gap:8px;align-items:center;justify-content:space-between;pointer-events:none}
+#hud>*{pointer-events:auto}
+#ttl{background:var(--pn);padding:8px 12px;border-radius:8px;font-size:14px}
+#ttl b{display:block;font-size:15px}
+#btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#map{position:fixed;left:10px;top:calc(64px + env(safe-area-inset-top,0px));width:112px;height:112px;border-radius:8px;background:rgba(30,40,25,.7);border:2px solid #e9b87f}
+#card{position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));width:min(520px,calc(100vw - 20px));max-height:44vh;overflow:auto;background:var(--pn);border-left:5px solid #ffd166;border-radius:8px;padding:12px 14px;display:none;line-height:1.45;font-size:15px}
+#card h3{margin:0 0 6px;font-size:18px}#card .as{font-size:12.5px;color:#f3c98d;margin-top:6px}
+#pad{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:none;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,46px);gap:5px}
+#pad button{padding:0;font-size:20px;opacity:.88;touch-action:none}
+#cover,#modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(#e08a55dd,#6b7a4acc)}
+#modal{display:none;background:rgba(20,16,12,.6);z-index:5}
+.box{max-width:560px;max-height:92vh;overflow:auto;background:#2b261f;border:2px solid #e9b87f;border-radius:12px;padding:20px 22px;line-height:1.5}
+.box h1{font-size:clamp(26px,6vw,40px);margin:0 0 6px;line-height:1.1}
+.box h2{margin:0 0 8px}.sub{opacity:.85;margin:3px 0}
+#err{color:#ffb4a0;margin:10px 0}
+.opt{display:block;width:100%;text-align:left;margin:6px 0}
+.opt.ok{background:#8fd18a}.opt.bad{background:#e58a7a}
+.fb{margin:8px 0;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.08)}
+kbd{background:#e9b87f;color:var(--ink);padding:1px 6px;border-radius:4px}
+@media(max-width:700px){#card{right:150px;width:auto;font-size:14px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="ttl"><b>Tur Candi Borobudur 3D</b><span id="prog">Titik informasi: 0/7</span></div>
+<div id="btns"><button id="bCam">Kamera: Orang ke-3</button><button id="bHelp">Bantuan</button><button id="bQuiz">Kuis</button><button id="bReset">Reset</button></div></div>
+<canvas id="map" width="224" height="224"></canvas>
+<div id="card"><h3 id="ct"></h3><div id="cb"></div><div class="as" id="ca"></div><button id="cx" style="margin-top:8px">Tutup</button></div>
+<div id="pad"><span></span><button id="pF" aria-label="Maju">▲</button><span></span><button id="pL" aria-label="Geser kiri">◀</button><button id="pB" aria-label="Mundur">▼</button><button id="pR" aria-label="Geser kanan">▶</button></div>
+<div id="cover"><div class="box"><h1>Tur Candi Borobudur 3D</h1>
+<p class="sub">Mata pelajaran: Sejarah</p><p class="sub">Kelas XI (Fase F) · SMA/MA</p>
+<p class="sub">Peninggalan kerajaan Hindu-Buddha di Indonesia</p>
+<p style="margin-top:14px"><i>Dikembangkan dengan sepenuh hati oleh Komang Ayu, S.Pd.</i></p>
+<div id="err"></div><button id="startBtn" style="font-size:18px;margin-top:6px">Mulai</button></div></div>
+<div id="modal"><div class="box" id="mb"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const $=i=>document.getElementById(i);
+const touch='ontouchstart' in window||navigator.maxTouchPoints>0;
+function fail(m){$('err').textContent=m;$('startBtn').style.display='none'}
+function modal(h){$('mb').innerHTML=h;$('modal').style.display='flex'}
+window.closeM=()=>{$('modal').style.display='none'};
+if(!window.THREE){fail('Library 3D (Three.js) gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');return}
+let R;try{R=new THREE.WebGLRenderer({canvas:$('c'),antialias:!touch})}catch(e){fail('Browser atau perangkat ini tidak mendukung WebGL. Coba browser lain yang lebih baru.');return}
+R.setPixelRatio(Math.min(devicePixelRatio||1,touch?1.5:2));
+R.shadowMap.enabled=!touch;
+const scene=new THREE.Scene(),skyA=new THREE.Color(0xe58a55),skyB=new THREE.Color(0xf6cfa3),sky=new THREE.Color();
+scene.background=sky;scene.fog=new THREE.FogExp2(0xe58a55,0.013);
+const cam=new THREE.PerspectiveCamera(70,1,0.1,700);cam.rotation.order='YXZ';
+const hemi=new THREE.HemisphereLight(0xffe2c0,0x4a5a3a,.5);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffc89a,.4);sun.castShadow=!touch;
+sun.shadow.mapSize.set(1024,1024);const sc=sun.shadow.camera;sc.left=sc.bottom=-34;sc.right=sc.top=34;sc.far=220;scene.add(sun);
+const disc=new THREE.Mesh(new THREE.SphereGeometry(7,16,12),new THREE.MeshBasicMaterial({color:0xfff0c0,fog:false}));scene.add(disc);
+const M=c=>new THREE.MeshLambertMaterial({color:c}),stone=M(0x9a9086),dark=M(0x6f665d),light=M(0xb9aea0);
+function add(g,m,x,y,z,sh){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=sh!==false;scene.add(o);return o}
+// tanah, halaman, bukit
+const ground=add(new THREE.PlaneGeometry(400,400),M(0x5b7a42),0,0,0);ground.rotation.x=-Math.PI/2;
+add(new THREE.BoxGeometry(40,.1,40),M(0xb5aa98),0,.03,0);
+for(let i=0;i<9;i++){const a=i/9*6.283,h=add(new THREE.SphereGeometry(40,16,10),M(i%2?0x4f6b4a:0x5a7650),Math.cos(a)*150,-12,Math.sin(a)*150,false);h.scale.y=.6}
+// candi
+const T=[{q:1,s:14,h:1.5},{q:1,s:12,h:3.5},{q:1,s:10,h:5.5},{q:1,s:8,h:7.5},{q:1,s:6,h:9.5},{q:0,s:5,h:11},{q:0,s:4,h:12},{q:0,s:3,h:13}];
+function H(x,z){const d=Math.max(Math.abs(x),Math.abs(z)),r=Math.hypot(x,z);let h=0;for(const t of T)if(t.q?d<=t.s:r<=t.s)h=t.h;return h}
+T.forEach((t,i)=>add(t.q?new THREE.BoxGeometry(2*t.s,t.h,2*t.s):new THREE.CylinderGeometry(t.s,t.s,t.h,36),i%2?stone:M(0x938a7e),0,t.h/2,0));
+// tangga selatan (sisi +z)
+for(let k=0;k<3;k++){const h=1.5-.5*k;add(new THREE.BoxGeometry(3.2,h,.5),light,0,h/2,14.25+.5*k)}
+for(let i=1;i<=4;i++){const ps=T[i-1].s,ph=T[i-1].h;for(let k=0;k<4;k++){const h=ph+.5*(k+1);add(new THREE.BoxGeometry(3.2,h,.5),light,0,h/2,ps-.25-.5*k)}}
+// panel relief (instanced)
+const rg=new THREE.BoxGeometry(1.7,1.2,.12),spots=[];
+for(let i=1;i<=4;i++){const s=T[i].s,y=T[i-1].h+1;for(let side=0;side<4;side++)for(let u=-s+1.8;u<=s-1.8;u+=2.6){if(side===0&&Math.abs(u)<2.2)continue;spots.push([side,u,s+.06,y])}}
+const rel=new THREE.InstancedMesh(rg,dark,spots.length),du=new THREE.Object3D();
+spots.forEach((p,i)=>{const a=p[0]*Math.PI/2,c=Math.cos(a),s=Math.sin(a);du.position.set(p[1]*c+p[2]*s,p[3],-p[1]*s+p[2]*c);du.rotation.y=a;du.updateMatrix();rel.setMatrixAt(i,du.matrix)});
+rel.castShadow=true;scene.add(rel);
+// stupa berlubang (disederhanakan: 8 buah)
+const bar=new THREE.BoxGeometry(.13,1.2,.13),bell=new THREE.CylinderGeometry(.6,.6,.2,16),roof=new THREE.ConeGeometry(.62,.7,16),sp=new THREE.SphereGeometry(.22,10,8),gold=M(0xc9a96a);
+for(let k=0;k<8;k++){const a=k*Math.PI/4+Math.PI/8,g=new THREE.Group();g.position.set(Math.cos(a)*3.35,12,Math.sin(a)*3.35);
+ const b=new THREE.Mesh(bell,stone);b.position.y=.1;g.add(b);
+ for(let j=0;j<8;j++){const m=new THREE.Mesh(bar,stone),aa=j*Math.PI/4;m.position.set(Math.cos(aa)*.45,.8,Math.sin(aa)*.45);g.add(m)}
+ const s=new THREE.Mesh(sp,gold);s.position.y=.8;g.add(s);const r=new THREE.Mesh(roof,stone);r.position.y=1.75;g.add(r);g.traverse(o=>o.castShadow=true);scene.add(g)}
+add(new THREE.CylinderGeometry(1.3,1.5,3.2,20),stone,0,14.6,0);add(new THREE.ConeGeometry(1.4,2.4,20),stone,0,17.4,0);add(new THREE.CylinderGeometry(.08,.08,1.4,6),stone,0,19.2,0);
+// pohon
+const NT=90,tr=new THREE.InstancedMesh(new THREE.CylinderGeometry(.25,.35,2.4,6),M(0x5a4632),NT),cr=new THREE.InstancedMesh(new THREE.ConeGeometry(1.8,5,8),M(0x3f6a35),NT);
+for(let i=0;i<NT;i++){const a=Math.random()*6.283,r=27+Math.random()*50,x=Math.cos(a)*r,z=Math.sin(a)*r,sc2=.8+Math.random()*.9;
+ du.rotation.set(0,0,0);du.scale.setScalar(sc2);du.position.set(x,1.2*sc2,z);du.updateMatrix();tr.setMatrixAt(i,du.matrix);du.position.set(x,(2.4+2)*sc2,z);du.updateMatrix();cr.setMatrixAt(i,du.matrix)}
+scene.add(tr,cr);
+// kabut
+const fc=document.createElement('canvas');fc.width=fc.height=64;const fx=fc.getContext('2d'),fg=fx.createRadialGradient(32,32,2,32,32,32);fg.addColorStop(0,'rgba(255,240,225,.55)');fg.addColorStop(1,'rgba(255,240,225,0)');fx.fillStyle=fg;fx.fillRect(0,0,64,64);
+const fm=new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(fc),transparent:true,depthWrite:false,fog:false,opacity:.7}),fogs=[];
+for(let i=0;i<12;i++){const f=new THREE.Mesh(new THREE.PlaneGeometry(40,9),fm);f.position.set((Math.random()-.5)*110,1.5+Math.random()*3,(Math.random()-.5)*110);f.userData.v=.4+Math.random()*.5;scene.add(f);fogs.push(f)}
+// titik informasi
+const P=[
+{x:-12,z:22,t:'Halaman Candi: Sejarah Pembangunan',b:'Borobudur berada di Kabupaten Magelang, Jawa Tengah. Candi Buddha ini umumnya dikaitkan dengan masa Dinasti Syailendra dan dibangun sekitar abad ke-8 sampai ke-9 Masehi. Borobudur ditetapkan sebagai Warisan Dunia UNESCO pada 1991.',a:'Asumsi: angka abad bersifat perkiraan. Guru dapat memverifikasinya.'},
+{x:13,z:6,t:'Kamadhatu (Kaki Candi)',b:'Bagian kaki candi melambangkan dunia nafsu manusia. Menurut pengetahuan umum, bagian ini sebagian besar tertutup tambahan struktur, dan relief Karmawibhangga tentang hukum sebab-akibat perbuatan berada di sana.',a:'Asumsi: rincian relief tersembunyi perlu diverifikasi guru.'},
+{x:-11,z:-3,t:'Rupadhatu (Lima Teras Persegi)',b:'Lima teras persegi ini melambangkan dunia berwujud, tempat manusia mulai melepaskan diri dari nafsu. Dindingnya dihiasi relief dan lorong-lorong untuk berkeliling candi (pradaksina).',a:''},
+{x:5,z:-9,t:'Relief dan Maknanya',b:'Relief bercerita tentang kehidupan Sang Buddha (Lalitavistara), kehidupan lampau (Jataka dan Awadana), dan pencarian ilmu (Gandawyuha). Relief dibaca sambil berjalan mengelilingi candi. Panel pada aplikasi ini hanya model sederhana.',a:'Asumsi: nama kisah disebut secara umum; panel 3D bukan salinan asli.'},
+{x:-4.6,z:-1.5,t:'Arupadhatu (Tiga Teras Bundar)',b:'Tiga teras bundar tanpa relief melambangkan dunia tanpa rupa. Bentuk yang polos melambangkan kebebasan dari keterikatan duniawi.',a:''},
+{x:3.7,z:0,t:'Stupa Berlubang',b:'Pada teras bundar terdapat 72 stupa berlubang yang di dalamnya berisi arca Buddha, mengelilingi stupa induk di tengah. Pada model ini hanya ada 8 stupa agar ringan dijalankan.',a:'Asumsi: jumlah 72 adalah angka umum; model disederhanakan.'},
+{x:0,z:-13,t:'Pelestarian Cagar Budaya',b:'Borobudur ditemukan kembali pada awal abad ke-19 setelah lama tertutup tanah dan tumbuhan, lalu dipugar pada abad ke-20, termasuk pemugaran besar dengan bantuan UNESCO. Saat berkunjung bersama sekolah: jangan memanjat, menyentuh relief, atau mencoret. Ikuti arahan petugas.',a:'Asumsi: tahun pemugaran tidak disebut; guru dapat menambahkan.'}];
+const mk=new THREE.SphereGeometry(.35,16,12),mkm=[];
+P.forEach((p,i)=>{const m=new THREE.Mesh(mk,new THREE.MeshBasicMaterial({color:0xffd166,fog:false}));p.y=H(p.x,p.z)+1.5;m.position.set(p.x,p.y,p.z);m.userData.i=i;scene.add(m);p.m=m;mkm.push(m);p.v=false});
+// ikon kuis (bulatan tanda tanya)
+const qc=document.createElement('canvas');qc.width=qc.height=128;{const g=qc.getContext('2d'),gr=g.createRadialGradient(50,46,6,64,64,60);gr.addColorStop(0,'#8fd0ff');gr.addColorStop(1,'#1f6fcf');g.fillStyle=gr;g.beginPath();g.arc(64,64,58,0,6.283);g.fill();g.lineWidth=6;g.strokeStyle='#fff';g.stroke();g.fillStyle='#fff';g.font='bold 84px Georgia,serif';g.textAlign='center';g.textBaseline='middle';g.fillText('?',64,70)}
+const qtex=new THREE.CanvasTexture(qc),QP=[[10,18],[-16,8],[-8,-12],[8,-4],[18,-8]],QO=[];let qnear=-1;
+QP.forEach((p,i)=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:qtex,fog:false}));s.userData.y=H(p[0],p[1])+1.9;s.userData.i=i;s.position.set(p[0],s.userData.y,p[1]);s.scale.set(1.3,1.3,1);scene.add(s);QO.push(s)});
+function refreshQ(){QO.forEach((o,i)=>o.material.color.set(ans[i]<0?0xffffff:ans[i]?0x9be39b:0xffb08a))}
+function openQ(i){qmode=1;qi=i;qr()}
+// penjelajah
+let third=true;const ex=new THREE.Group(),EM=c=>new THREE.MeshLambertMaterial({color:c});
+function part(g,m,x,y,z,pw,ph,pd,oy){const o=new THREE.Mesh(g,m);o.castShadow=true;if(oy){const pv=new THREE.Group();pv.position.set(x,y,z);o.position.y=oy;pv.add(o);ex.add(pv);return pv}o.position.set(x,y,z);ex.add(o);return o}
+part(new THREE.BoxGeometry(.5,.7,.3),EM(0x2f6f8f),0,.95,0);
+part(new THREE.SphereGeometry(.2,12,10),EM(0xe0ac86),0,1.45,0);
+part(new THREE.CylinderGeometry(.34,.34,.04,14),EM(0x8a5a2b),0,1.6,0);
+part(new THREE.CylinderGeometry(.17,.2,.16,12),EM(0x8a5a2b),0,1.69,0);
+part(new THREE.BoxGeometry(.4,.5,.2),EM(0xb5651d),0,1.0,.25);
+ex.userData.l1=part(new THREE.BoxGeometry(.2,.7,.22),EM(0x4a3b2a),-.13,.6,0,0,0,0,-.3);
+ex.userData.l2=part(new THREE.BoxGeometry(.2,.7,.22),EM(0x4a3b2a),.13,.6,0,0,0,0,-.3);
+ex.userData.a1=part(new THREE.BoxGeometry(.14,.55,.14),EM(0xe0ac86),-.34,1.28,0,0,0,0,-.25);
+ex.userData.a2=part(new THREE.BoxGeometry(.14,.55,.14),EM(0xe0ac86),.34,1.28,0,0,0,0,-.25);
+ex.scale.setScalar(1.1);scene.add(ex);
+// status
+let px,pz,py,yaw,pitch,t0,near,dismiss,played;const keys={};
+function reset(){px=0;pz=26;py=1.6;yaw=0;pitch=0;t0=performance.now();near=-1;dismiss=-1;P.forEach(p=>{p.v=false;p.m.material.color.set(0xffd166)});$('card').style.display='none';closeM();prog();ans.fill(-1);refreshQ();qnear=-1}
+function prog(){const n=P.filter(p=>p.v).length;$('prog').textContent='Titik informasi: '+n+'/'+P.length;return n}
+function showCard(i){const p=P[i];$('ct').textContent=p.t;$('cb').textContent=p.b;$('ca').textContent=p.a;$('card').style.display='block';
+ if(!p.v){p.v=true;p.m.material.color.set(0x7ddc8a);if(prog()===P.length)setTimeout(()=>modal('<h2>Tur selesai!</h2><p>Kamu sudah mengunjungi semua titik informasi. Siap mengerjakan kuis 5 soal?</p><button onclick="startQuiz()">Mulai kuis</button> <button onclick="closeM()">Nanti saja</button>'),900)}}
+$('cx').onclick=()=>{dismiss=near;$('card').style.display='none'};
+function helpM(){modal('<h2>Petunjuk Kontrol</h2><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> atau panah: berjalan. Seret mouse atau jari pada layar: melihat sekeliling. Di ponsel, pakai tombol panah di kanan bawah.</p><p>Tombol Kamera mengganti tampilan orang ke-3 (penjelajah terlihat) dan orang ke-1. Dekati bola emas yang berdenyut atau klik bola itu untuk membaca keterangan. Bola hijau berarti sudah dibaca. Bulatan biru bertanda tanya (?) adalah soal kuis: dekati atau klik untuk menjawab. Peta mini di kiri atas menunjukkan posisimu. Mode jelajah bebas: berjalanlah ke mana saja. Tombol Reset mengembalikan posisi dan tur.</p><button onclick="closeM()">Mengerti</button>')}
+$('bHelp').onclick=helpM;$('bCam').onclick=()=>{third=!third;$('bCam').textContent='Kamera: Orang ke-'+(third?'3':'1')};$('bReset').onclick=reset;$('bQuiz').onclick=()=>startQuiz();
+$('startBtn').onclick=()=>{$('cover').style.display='none';reset();helpM()};
+// kuis
+const Q=[
+{q:'Di provinsi manakah Candi Borobudur berada?',o:['Jawa Timur','Jawa Tengah','Bali','Sumatra Selatan'],a:1,e:'Borobudur berada di Kabupaten Magelang, Jawa Tengah.'},
+{q:'Pembangunan Borobudur umumnya dikaitkan dengan dinasti...',o:['Syailendra','Majapahit','Sriwijaya','Kediri'],a:0,e:'Umumnya dikaitkan dengan Dinasti Syailendra yang menganut Buddha Mahayana (perkiraan abad ke-8 sampai ke-9 M).'},
+{q:'Urutan tingkatan dari bawah ke atas adalah...',o:['Arupadhatu, Rupadhatu, Kamadhatu','Rupadhatu, Kamadhatu, Arupadhatu','Kamadhatu, Arupadhatu, Rupadhatu','Kamadhatu, Rupadhatu, Arupadhatu'],a:3,e:'Dari bawah: Kamadhatu (dunia nafsu), Rupadhatu (dunia berwujud), Arupadhatu (dunia tanpa rupa).'},
+{q:'Teras bundar tanpa relief yang berisi stupa berlubang disebut...',o:['Kamadhatu','Rupadhatu','Karmawibhangga','Arupadhatu'],a:3,e:'Arupadhatu melambangkan dunia tanpa rupa, sehingga bentuknya polos.'},
+{q:'Sikap yang tepat saat berkunjung ke candi sebagai cagar budaya adalah...',o:['Memanjat stupa agar foto lebih bagus','Mengambil batu kecil sebagai kenang-kenangan','Mengikuti aturan dan tidak menyentuh atau mencoret relief','Duduk di atas panel relief'],a:2,e:'Cagar budaya rentan rusak. Kita melestarikannya dengan mematuhi aturan dan menjaga kebersihan.'}];
+let qi=0,sc3=0,qmode=0;const ans=[-1,-1,-1,-1,-1];
+window.startQuiz=()=>{qmode=0;qi=0;sc3=0;qr()};
+function qr(){if(qi>=Q.length){modal('<h2>Hasil kuis</h2><p>Skormu: <b>'+sc3+' dari '+Q.length+'</b></p><p>'+(sc3>=4?'Hebat! Kamu memahami materi dengan baik.':'Ayo jelajahi candi sekali lagi lalu coba lagi.')+'</p><button onclick="startQuiz()">Ulangi</button> <button onclick="closeM()">Tutup</button>');return}
+ const q=Q[qi];modal('<h2>Soal '+(qi+1)+' dari '+Q.length+'</h2><p>'+q.q+'</p>'+q.o.map((o,i)=>'<button class="opt" onclick="qa('+i+')">'+o+'</button>').join('')+'<div id="fb"></div>'+(qmode?'<button onclick="closeM()" style="margin-top:6px">Tutup dulu</button>':''))}
+window.qa=i=>{const q=Q[qi],bs=document.querySelectorAll('.opt');if(bs[0].disabled)return;bs.forEach((b,j)=>{b.disabled=true;if(j===q.a)b.classList.add('ok');else if(j===i)b.classList.add('bad')});
+ const ok=i===q.a;if(ok)sc3++;if(qmode)ans[qi]=ok?1:0;$('fb').innerHTML='<div class="fb"><b>'+(ok?'Benar!':'Belum tepat.')+'</b> '+q.e+'</div><button onclick="qn()">'+(qi<Q.length-1?'Lanjut':'Lihat hasil')+'</button>'};
+window.qn=()=>{if(qmode){refreshQ();closeM();if(ans.every(v=>v>=0)){const s=ans.reduce((a,b)=>a+b,0);setTimeout(()=>modal('<h2>Hasil kuis</h2><p>Semua bulatan tanda tanya sudah dijawab. Skormu: <b>'+s+' dari 5</b></p><p>'+(s>=4?'Hebat! Kamu memahami materi dengan baik.':'Jelajahi lagi lalu jawab ulang bulatan yang berwarna oranye.')+'</p><button onclick="closeM()">Tutup</button>'),400)}return}qi++;qr()};
+// input
+addEventListener('keydown',e=>{keys[e.code]=true});addEventListener('keyup',e=>{keys[e.code]=false});
+const pad={};[['pF','F'],['pB','B'],['pL','L'],['pR','R']].forEach(([id,k])=>{const b=$(id);b.onpointerdown=e=>{pad[k]=true;b.setPointerCapture(e.pointerId)};b.onpointerup=b.onpointercancel=()=>{pad[k]=false}});
+if(touch)$('pad').style.display='grid';
+const cv=$('c'),ray=new THREE.Raycaster(),v2=new THREE.Vector2();let dr=null;
+cv.onpointerdown=e=>{dr={x:e.clientX,y:e.clientY,m:0};cv.setPointerCapture(e.pointerId)};
+cv.onpointermove=e=>{if(!dr)return;const dx=e.clientX-dr.x,dy=e.clientY-dr.y;dr.m+=Math.abs(dx)+Math.abs(dy);dr.x=e.clientX;dr.y=e.clientY;yaw-=dx*.005;pitch=Math.max(-1.2,Math.min(1.2,pitch-dy*.005))};
+cv.onpointerup=e=>{if(dr&&dr.m<8){v2.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(v2,cam);const h=ray.intersectObjects(mkm)[0],q2=ray.intersectObjects(QO)[0];if(q2)openQ(q2.object.userData.i);else if(h){const i=h.object.userData.i;dismiss=-1;near=i;showCard(i)}}dr=null};
+function resize(){const w=innerWidth,h=innerHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+// peta mini
+const mc=$('map').getContext('2d');let fr=0;
+function drawMap(t){fr++;if(fr%3)return;const S=224/72;mc.clearRect(0,0,224,224);mc.save();mc.translate(112,112);mc.scale(S,S);
+ T.forEach(o=>{mc.fillStyle=o.q?'rgba(150,140,125,.9)':'rgba(190,180,165,.95)';if(o.q)mc.fillRect(-o.s,-o.s,2*o.s,2*o.s);else{mc.beginPath();mc.arc(0,0,o.s,0,6.283);mc.fill()}});
+ const nx=P.findIndex(p=>!p.v);P.forEach((p,i)=>{mc.fillStyle=p.v?'#7ddc8a':'#ffd166';mc.beginPath();mc.arc(p.x,p.z,i===nx?2.3+Math.sin(t*4):1.5,0,6.283);mc.fill()});
+ QP.forEach((p,i)=>{mc.fillStyle=ans[i]>=0?'#bbb':'#4aa3ff';mc.fillRect(p[0]-1.2,p[1]-1.2,2.4,2.4)});mc.translate(px,pz);mc.rotate(-yaw);mc.fillStyle='#fff';mc.strokeStyle='#222';mc.lineWidth=.4;mc.beginPath();mc.moveTo(0,-3);mc.lineTo(2,2);mc.lineTo(-2,2);mc.closePath();mc.fill();mc.stroke();mc.restore()}
+// loop
+const clock=new THREE.Clock();reset();
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.1),t=performance.now()/1000;
+ const el=Math.min(1,(performance.now()-t0)/90000);
+ sky.copy(skyA).lerp(skyB,el);scene.fog.color.copy(sky);hemi.intensity=.5+.45*el;sun.intensity=.4+.8*el;
+ const e=.12+el*.75;sun.position.set(-70*Math.cos(e),70*Math.sin(e),40);disc.position.copy(sun.position).multiplyScalar(4);
+ let f=(keys.KeyW||keys.ArrowUp||pad.F?1:0)-(keys.KeyS||keys.ArrowDown||pad.B?1:0),s=(keys.KeyD||keys.ArrowRight||pad.R?1:0)-(keys.KeyA||keys.ArrowLeft||pad.L?1:0);
+ if($('cover').style.display!=='none'||$('modal').style.display==='flex'){f=s=0}
+ if(f||s){const l=Math.hypot(f,s),v=5*dt/l,sn=Math.sin(yaw),cs=Math.cos(yaw),nx=px+(-sn*f+cs*s)*v,nz=pz+(-cs*f-sn*s)*v;
+  if(Math.hypot(nx,nz)>2.1&&Math.abs(nx)<45&&Math.abs(nz)<45){px=nx;pz=nz}}
+ py+=((H(px,pz)+1.6)-py)*Math.min(1,8*dt);
+ const gy=py-1.6;ex.visible=third;
+ if(third){const p=Math.max(-.5,Math.min(1,pitch)),d=5,ty=gy+1.5;const cx=px+Math.sin(yaw)*Math.cos(p)*d,cz=pz+Math.cos(yaw)*Math.cos(p)*d;let cy=ty-Math.sin(p)*d+.6;cy=Math.max(cy,H(cx,cz)+.7);cam.position.set(cx,cy,cz);cam.lookAt(px,ty,pz);
+  ex.position.set(px,gy,pz);ex.rotation.y=yaw;const w=(f||s)?Math.sin(t*9)*.7:0,u=ex.userData;u.l1.rotation.x=w;u.l2.rotation.x=-w;u.a1.rotation.x=-w;u.a2.rotation.x=w}
+ else{cam.position.set(px,py,pz);cam.rotation.set(pitch,yaw,0)}
+ let b=-1,bd=1e9;P.forEach((p,i)=>{const d=Math.hypot(px-p.x,pz-p.z);if(d<1.8&&d<bd){bd=d;b=i}});
+ if(b!==near){near=b;if(b<0){$('card').style.display='none';dismiss=-1}else if(b!==dismiss)showCard(b)}
+ P.forEach((p,i)=>p.m.scale.setScalar(1+.28*Math.sin(t*3+i)));
+ QO.forEach((o,i)=>{const k=1.3+.15*Math.sin(t*2.5+i*1.7);o.scale.set(k,k,1);o.position.y=o.userData.y+.15*Math.sin(t*2+i)});
+ let qb=-1;QP.forEach((p,i)=>{if(Math.hypot(px-p[0],pz-p[1])<1.6)qb=i});if(qb!==qnear){qnear=qb;if(qb>=0&&$('modal').style.display!=='flex')openQ(qb)}
+ fogs.forEach(g=>{g.position.x+=g.userData.v*dt;if(g.position.x>60)g.position.x=-60;g.rotation.y=Math.atan2(cam.position.x-g.position.x,cam.position.z-g.position.z)});
+ drawMap(t);R.render(scene,cam)}
+loop();
+})();
+</script></body></html>
